@@ -54,10 +54,9 @@ public class OsrsLoader {
         applet.setSize(width, height);
         applet.init();
 
-        Thread.sleep(3000);
         val window = new JFrame("OldSchool RuneScape");
         window.getContentPane().setLayout(new BoxLayout(window.getContentPane(), BoxLayout.Y_AXIS));
-        window.getContentPane().add(new DisplayTest((RSClient) applet));
+        window.getContentPane().add(applet);
         window.pack();
         window.setLocationRelativeTo(null);
         window.setVisible(true);

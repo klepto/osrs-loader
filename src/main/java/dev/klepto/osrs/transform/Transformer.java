@@ -6,10 +6,7 @@ import dev.klepto.osrs.OsrsLoader;
 import dev.klepto.osrs.analyze.ClassBytes;
 import io.github.classgraph.ClassGraph;
 import lombok.val;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 
 import java.lang.reflect.Method;
 import java.util.HashSet;
@@ -18,9 +15,11 @@ import java.util.stream.Collectors;
 
 import static org.objectweb.asm.ClassReader.EXPAND_FRAMES;
 import static org.objectweb.asm.ClassReader.SKIP_FRAMES;
-import static org.objectweb.asm.ClassWriter.COMPUTE_FRAMES;
-import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Type.*;
+import static org.objectweb.asm.Type.DOUBLE;
+import static org.objectweb.asm.Type.FLOAT;
+import static org.objectweb.asm.Type.LONG;
 
 /**
  * @author <a href="https://klepto.dev/">Augustinas R.</a>
@@ -82,11 +81,13 @@ public class Transformer {
         if (method.isAnnotationPresent(TargetGetter.class)) {
             createGetter(classVisitor, method, method.getAnnotation(TargetGetter.class).value());
         }
+        if (method.isAnnotationPresent(TargetSetter.class)) {
+            createSetter(classVisitor, method, method.getAnnotation(TargetSetter.class).value());
+        }
     }
 
     private void createGetter(ClassVisitor classVisitor, Method method, OsrsDefinitions definition) {
-        System.out.println("Creating: " + method);
-        val type = Type.getType(method);
+        val type = getType(method);
         val visitor = classVisitor.visitMethod(ACC_PUBLIC, method.getName(), type.getDescriptor(), null, null);
         val classInfo = definition.getClassInfo();
         val info = definition.getFieldInfo();
@@ -97,9 +98,90 @@ public class Transformer {
         } else {
             visitor.visitFieldInsn(GETSTATIC, classInfo.getName(), info.getName(), info.getDescriptor());
         }
-        visitor.visitMaxs(2, 2);
-        visitor.visitInsn(ARETURN);
+        if (definition.getGetMultiplier() != 0 && info.hasDescriptor(int.class)) {
+            visitor.visitLdcInsn(definition.getGetMultiplier());
+            visitor.visitInsn(IMUL);
+        }
+        visitor.visitMaxs(3, 3);
+        appendReturn(visitor, method.getReturnType());
         visitor.visitEnd();
+    }
+
+    private void createSetter(ClassVisitor classVisitor, Method method, OsrsDefinitions definition) {
+        val type = getType(method);
+        val visitor = classVisitor.visitMethod(ACC_PUBLIC, method.getName(), type.getDescriptor(), null, null);
+        val classInfo = definition.getClassInfo();
+        val info = definition.getFieldInfo();
+
+        if (!info.isStatic()) {
+            visitor.visitVarInsn(ALOAD, 0);
+        }
+
+        appendLoad(visitor, method.getParameterTypes()[0], 1);
+        if (definition.getSetMultiplier() != 0) {
+            visitor.visitLdcInsn(definition.getSetMultiplier());
+            visitor.visitInsn(IMUL);
+        }
+
+        if (!info.isStatic()) {
+            visitor.visitFieldInsn(PUTFIELD, classInfo.getName(), info.getName(), info.getDescriptor());
+        } else {
+            visitor.visitFieldInsn(PUTSTATIC, classInfo.getName(), info.getName(), info.getDescriptor());
+        }
+
+        visitor.visitMaxs(2, 2);
+        visitor.visitInsn(RETURN);
+        visitor.visitEnd();
+    }
+
+    private void appendLoad(MethodVisitor methodVisitor, Class<?> classType, int index) {
+        val type = getType(classType);
+        switch (type.getSort()) {
+            case ARRAY:
+            case OBJECT:
+                methodVisitor.visitIntInsn(ALOAD, index);
+                break;
+            case BOOLEAN:
+            case CHAR:
+            case SHORT:
+            case INT:
+                methodVisitor.visitIntInsn(ILOAD, index);
+                break;
+            case LONG:
+                methodVisitor.visitIntInsn(LLOAD, index);
+                break;
+            case FLOAT:
+                methodVisitor.visitIntInsn(FLOAD, index);
+                break;
+            case DOUBLE:
+                methodVisitor.visitIntInsn(DLOAD, index);
+                break;
+        }
+    }
+
+    private void appendReturn(MethodVisitor methodVisitor, Class<?> classType) {
+        val type = getType(classType);
+        switch (type.getSort()) {
+            case ARRAY:
+            case OBJECT:
+                methodVisitor.visitInsn(ARETURN);
+                break;
+            case BOOLEAN:
+            case CHAR:
+            case SHORT:
+            case INT:
+                methodVisitor.visitInsn(IRETURN);
+                break;
+            case LONG:
+                methodVisitor.visitInsn(LRETURN);
+                break;
+            case FLOAT:
+                methodVisitor.visitInsn(FRETURN);
+                break;
+            case DOUBLE:
+                methodVisitor.visitInsn(DRETURN);
+                break;
+        }
     }
 
 }

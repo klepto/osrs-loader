@@ -6,14 +6,12 @@ import lombok.*;
  * @author <a href="https://klepto.dev/">Augustinas R.</a>
  */
 @Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class FieldInsnInfo extends InsnInfo implements DescriptorInfo {
+public class InsnInfo {
 
     private int index;
     private int opcode;
-    private String owner;
-    private String name;
-    private String descriptor;
 
 }

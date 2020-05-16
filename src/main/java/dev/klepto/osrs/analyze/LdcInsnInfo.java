@@ -1,19 +1,21 @@
 package dev.klepto.osrs.analyze;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * @author <a href="https://klepto.dev/">Augustinas R.</a>
  */
 @Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class FieldInsnInfo extends InsnInfo implements DescriptorInfo {
+public class LdcInsnInfo extends InsnInfo {
 
     private int index;
     private int opcode;
-    private String owner;
-    private String name;
-    private String descriptor;
+    private Object value;
 
 }

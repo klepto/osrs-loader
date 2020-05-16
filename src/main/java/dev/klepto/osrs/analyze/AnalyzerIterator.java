@@ -4,7 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.val;
 import org.objectweb.asm.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
+
+import static org.objectweb.asm.Opcodes.LDC;
 
 /**
  * @author <a href="https://klepto.dev/">Augustinas R.</a>
@@ -68,15 +72,47 @@ public class AnalyzerIterator {
             }
             val info = new MethodInfo(access, name, descriptor, signature, exceptions);
             analyzer.setMethodInfo(info);
-            analyzer.analyze(info);
+            if (analyzer.analyze(info)) {
+                return new MethodIterator();
+            }
             return null;
         }
     }
 
     private class MethodIterator extends MethodVisitor {
 
+        private final List<InsnInfo> instructions = new ArrayList<>();
+
         public MethodIterator() {
             super(Opcodes.ASM7);
+        }
+
+
+        @Override
+        public void visitInsn(int opcode) {
+            if (shouldIgnoreRemaining()) {
+                return;
+            }
+
+            instructions.add(new InsnInfo(instructions.size(), opcode));
+        }
+
+        @Override
+        public void visitIntInsn(int opcode, int operand) {
+            if (shouldIgnoreRemaining()) {
+                return;
+            }
+
+            instructions.add(new IntInsnInfo(instructions.size(), opcode, operand));
+        }
+
+        @Override
+        public void visitLdcInsn(Object value) {
+            if (shouldIgnoreRemaining()) {
+                return;
+            }
+
+            instructions.add(new LdcInsnInfo(instructions.size(), LDC, value));
         }
 
         @Override
@@ -85,10 +121,28 @@ public class AnalyzerIterator {
                 return;
             }
 
-            val info = new FieldInsnInfo(opcode, owner, name, descriptor);
-            analyzer.analyze(info);
+            instructions.add(new FieldInsnInfo(instructions.size(), opcode, owner, name, descriptor));
         }
 
+        @Override
+        public void visitTypeInsn(int opcode, String type) {
+            if (shouldIgnoreRemaining()) {
+                return;
+            }
+
+            instructions.add(new TypeInsnInfo(instructions.size(), opcode, type));
+        }
+
+        @Override
+        public void visitJumpInsn(int opcode, Label label) {
+            instructions.add(new InsnInfo(instructions.size(), opcode));
+        }
+
+        @Override
+        public void visitEnd() {
+            analyzer.setInstructions(instructions);
+            analyzer.analyze(instructions);
+        }
     }
 
 }

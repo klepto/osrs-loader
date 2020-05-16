@@ -22,6 +22,8 @@ import java.util.Properties;
 @RequiredArgsConstructor
 public class OsrsStub implements AppletStub, AppletContext {
 
+    static String nig;
+
     private final String javConfig;
     private final Properties properties;
 
