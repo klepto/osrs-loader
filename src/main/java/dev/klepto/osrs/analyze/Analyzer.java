@@ -60,6 +60,9 @@ public abstract class Analyzer {
     }
 
     public boolean isFieldDefined(FieldInsnInfo info) {
+        if (!classes.containsKey(info.getOwner())) {
+            return false;
+        }
         return fields.containsKey(info.getOwner() + "." + info.getName());
     }
 

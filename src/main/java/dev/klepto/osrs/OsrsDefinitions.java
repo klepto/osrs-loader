@@ -18,6 +18,7 @@ public enum OsrsDefinitions {
     BUFFER_PROVIDER_FIELD,
     CANVAS_BUFFER_PROVIDER_CLASS,
     CANVAS_BUFFER_PROVIDER_IMAGE_FIELD,
+    CANVAS_BUFFER_PROVIDER_DRAW_METHOD,
     CAMERA_CALCULATE_METHOD,
     CAMERA_PITCH_FIELD,
     CAMERA_YAW_FIELD,
@@ -26,7 +27,8 @@ public enum OsrsDefinitions {
     CAMERA_Z_FIELD,
     LOGIN_METHOD,
     USERNAME_FIELD,
-    PASSWORD_FIELD;
+    PASSWORD_FIELD,
+    RENDERER_CLASS;
 
     @Setter private int getMultiplier;
     @Setter private int setMultiplier;

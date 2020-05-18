@@ -11,8 +11,8 @@ import java.lang.annotation.Target;
  * @author <a href="https://klepto.dev/">Augustinas R.</a>
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
-public @interface TargetSetter {
+@Target(ElementType.TYPE)
+public @interface Interface {
 
     OsrsDefinitions value();
 

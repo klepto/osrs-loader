@@ -4,6 +4,7 @@ import com.google.common.collect.ObjectArrays;
 import dev.klepto.osrs.OsrsDefinitions;
 import dev.klepto.osrs.OsrsLoader;
 import dev.klepto.osrs.analyze.ClassBytes;
+import dev.klepto.osrs.internal.RSCanvasBufferProvider;
 import io.github.classgraph.ClassGraph;
 import lombok.val;
 import org.objectweb.asm.*;
@@ -13,8 +14,9 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static dev.klepto.osrs.OsrsDefinitions.CANVAS_BUFFER_PROVIDER_DRAW_METHOD;
 import static org.objectweb.asm.ClassReader.EXPAND_FRAMES;
-import static org.objectweb.asm.ClassReader.SKIP_FRAMES;
+import static org.objectweb.asm.ClassWriter.COMPUTE_FRAMES;
 import static org.objectweb.asm.Opcodes.*;
 import static org.objectweb.asm.Type.*;
 import static org.objectweb.asm.Type.DOUBLE;
@@ -38,7 +40,7 @@ public class Transformer {
                 .enableAnnotationInfo()
                 .scan()) {
             return new HashSet<>(result.getAllClasses()
-                    .filter(info -> info.hasAnnotation(TargetClass.class.getName()))
+                    .filter(info -> info.hasAnnotation(Interface.class.getName()))
                     .loadClasses());
         }
     }
@@ -46,7 +48,7 @@ public class Transformer {
     public ClassBytes transform(ClassBytes classBytes) {
         val tranformations = this.transformations.stream()
                 .filter(inter -> {
-                    val annotation = inter.getAnnotation(TargetClass.class).value();
+                    val annotation = inter.getAnnotation(Interface.class).value();
                     val className = annotation.getClassInfo().getName();
                     return classBytes.getName().equals(className);
                 }).collect(Collectors.toSet());
@@ -61,7 +63,7 @@ public class Transformer {
     private ClassBytes transform(ClassBytes classBytes, Class<?> transformation) {
         val methods = transformation.getDeclaredMethods();
         val classReader = new ClassReader(classBytes.getBytecode());
-        val classWriter = new ClassWriter(classReader, SKIP_FRAMES);
+        val classWriter = new ClassWriter(classReader, COMPUTE_FRAMES);
         val visitor = new ClassVisitor(ASM7, classWriter) {
             @Override
             public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
@@ -71,18 +73,54 @@ public class Transformer {
                     createTransformMethod(this, method);
                 }
             }
+
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                val methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions);
+                if (transformation == RSCanvasBufferProvider.class
+                        && name.equals(CANVAS_BUFFER_PROVIDER_DRAW_METHOD.getMethodInfo().getName())) {
+                    createRenderingCallback(this, methodVisitor);
+                    return null;
+                }
+                return methodVisitor;
+            }
         };
 
         classReader.accept(visitor, EXPAND_FRAMES);
         return new ClassBytes(classBytes.getName(), classWriter.toByteArray());
     }
 
+    private void createRenderingCallback(ClassVisitor classVisitor, MethodVisitor visitor) {
+        val classInfo = CANVAS_BUFFER_PROVIDER_DRAW_METHOD.getClassInfo();
+        val methodInfo = CANVAS_BUFFER_PROVIDER_DRAW_METHOD.getMethodInfo();
+
+        visitor.visitFieldInsn(GETSTATIC, classInfo.getName(), "callback", "Ljava/lang/Runnable;");
+        val label = new Label();
+        visitor.visitJumpInsn(IFNULL, label);
+        visitor.visitFieldInsn(GETSTATIC, classInfo.getName(), "callback", "Ljava/lang/Runnable;");
+        visitor.visitMethodInsn(INVOKEINTERFACE, "java/lang/Runnable", "run", "()V", true);
+        visitor.visitLabel(label);
+        visitor.visitInsn(RETURN);
+        visitor.visitMaxs(1, 2);
+        visitor.visitEnd();
+
+        val fieldVisitor = classVisitor.visitField(ACC_STATIC, "callback", "Ljava/lang/Runnable;", null, null);
+        fieldVisitor.visitEnd();
+
+        visitor = classVisitor.visitMethod(ACC_PUBLIC, "setCallback", "(Ljava/lang/Runnable;)V", null, null);
+        visitor.visitVarInsn(ALOAD, 1);
+        visitor.visitFieldInsn(PUTSTATIC, classInfo.getName(), "callback", "Ljava/lang/Runnable;");
+        visitor.visitInsn(RETURN);
+        visitor.visitMaxs(1, 2);
+        visitor.visitEnd();
+    }
+
     private void createTransformMethod(ClassVisitor classVisitor, Method method) {
-        if (method.isAnnotationPresent(TargetGetter.class)) {
-            createGetter(classVisitor, method, method.getAnnotation(TargetGetter.class).value());
+        if (method.isAnnotationPresent(Getter.class)) {
+            createGetter(classVisitor, method, method.getAnnotation(Getter.class).value());
         }
-        if (method.isAnnotationPresent(TargetSetter.class)) {
-            createSetter(classVisitor, method, method.getAnnotation(TargetSetter.class).value());
+        if (method.isAnnotationPresent(Setter.class)) {
+            createSetter(classVisitor, method, method.getAnnotation(Setter.class).value());
         }
     }
 

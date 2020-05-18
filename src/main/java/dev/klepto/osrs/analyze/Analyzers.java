@@ -43,7 +43,6 @@ public class Analyzers {
                 .collect(Collectors.toSet());
 
         for (int i = 0; i < 10; i++) {
-            System.out.println("Analyzer iteration: " + i);
             val complete = iterators.stream().noneMatch(AnalyzerIterator::iterate);
             if (complete) {
                 break;
